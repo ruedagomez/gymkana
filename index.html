@@ -337,14 +337,17 @@ import {
   doc, getDoc, updateDoc, onSnapshot, collection, query, where, limit, getDocs, arrayUnion, deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-/* ══════════ FIREBASE (mismo proyecto que el resto de Racing Lab) ══════════ */
+/* ══════════ FIREBASE ══════════
+   Proyecto propio de la gynkana: armada-invencible-8dfa8 (reaprovechado,
+   ya no se usaba). Es un proyecto distinto al de Racing Lab
+   (racing-portuense-scouting) — a propósito, para no mezclar datos. */
 const app = initializeApp({
-  apiKey:"AIzaSyBNDylPVfge6SFXVfJAcna9v7qh_CffI7Y",
-  authDomain:"racing-portuense-scouting.firebaseapp.com",
-  projectId:"racing-portuense-scouting",
-  storageBucket:"racing-portuense-scouting.firebasestorage.app",
-  messagingSenderId:"1073919975511",
-  appId:"1:1073919975511:web:7c7f59495d1f67f6f44312"
+  apiKey:"AIzaSyD-ak9cF8eg6-nj3XrFOlJdnWoq5y5UF9M",
+  authDomain:"armada-invencible-8dfa8.firebaseapp.com",
+  projectId:"armada-invencible-8dfa8",
+  storageBucket:"armada-invencible-8dfa8.firebasestorage.app",
+  messagingSenderId:"523353791827",
+  appId:"1:523353791827:web:74ff139bc00896652695a6"
 });
 const auth = getAuth(app);
 
@@ -357,7 +360,13 @@ try {
   db = getFirestore(app);
 }
 
-/* ══════════ CLOUDINARY (mismo cloud/preset que el resto de Racing Lab) ══════════ */
+/* ══════════ CLOUDINARY ══════════
+   ⚠️ Sin confirmar todavía: uso el cloud/preset de Racing Lab
+   (dprtymvge / racing_lab) porque Cloudinary es independiente del
+   proyecto de Firebase y no dijiste que quisieras cambiarlo también.
+   Si Armada Invencible tenía su propio cloud/preset y prefieres usar
+   ese, cámbialo aquí y en gynkana-organizador.html no hace falta
+   tocar nada más — no se usa Cloudinary en la consola del organizador. */
 const CLOUD = 'dprtymvge';
 const PRESET = 'racing_lab';
 async function subirACloudinary(file){

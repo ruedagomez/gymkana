@@ -251,7 +251,7 @@ input{font-family:inherit;touch-action:manipulation;}
     <p class="desc">El organizador os lo ha dado en papel o por WhatsApp. Escribidlo tal cual.</p>
     <div class="campo">
       <label for="in-codigo">Código de equipo</label>
-      <input id="in-codigo" placeholder="Ej. RCP-07" autocomplete="off" autocapitalize="characters"
+      <input id="in-codigo" placeholder="Ej. RCP07" autocomplete="off" autocapitalize="characters"
              enterkeyhint="done" maxlength="24">
     </div>
     <p class="err" id="err-codigo">Código no encontrado. Revisadlo con el organizador.</p>
@@ -473,7 +473,7 @@ async function arrancar(){
 }
 
 function normalizarCodigo(v){
-  return (v||'').trim().toUpperCase().replace(/\s+/g,'');
+  return (v||'').trim().toUpperCase().replace(/[\s-]+/g,'');
 }
 
 /* ══════════ PANTALLA CÓDIGO ══════════ */

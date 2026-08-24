@@ -55,7 +55,9 @@ input,select,textarea{font-family:inherit;outline:none;}
 .topbar-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:.1em;color:var(--txt);text-transform:uppercase;}
 .topbar-right{display:flex;align-items:center;gap:10px;}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--fit);animation:dot 2s infinite;flex-shrink:0;}
+.sync-dot.caida{background:var(--warn);animation:none;}
 .sync-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mid);}
+.sync-lbl.caida{color:var(--warn);font-weight:700;}
 .sync-row{display:flex;align-items:center;gap:6px;}
 
 .page{display:none;padding:32px 36px 48px;animation:fadeUp .3s ease;}
@@ -127,11 +129,16 @@ input,select,textarea{font-family:inherit;outline:none;}
 .toast.err{border-left-color:#dc2626;}
 
 /* CÓDIGOS */
-.codigos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
 .codigo-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--bdr);border-radius:5px;padding:9px 11px;}
 .codigo-chip .mono{font-weight:700;color:var(--txt);}
 .codigo-chip button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px;}
 .codigo-chip button:hover{color:var(--r);}
+.tbl-nombre-input{width:100%;background:transparent;border:1.5px solid transparent;border-radius:4px;padding:5px 7px;font-family:'Barlow',sans-serif;font-size:13px;color:var(--txt);transition:border-color .15s,background .15s;}
+.tbl-nombre-input:hover{border-color:var(--bdr);background:var(--bg);}
+.tbl-nombre-input:focus{border-color:var(--r);background:var(--wh);}
+.tbl-nombre-input.sin-nombre{color:var(--faint);font-style:italic;}
+.tbl-guardado{font-size:10px;color:var(--fit);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:0;transition:opacity .2s;margin-left:6px;}
+.tbl-guardado.show{opacity:1;}
 
 /* AJUSTAR SITIOS */
 .ajuste-layout{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;}
@@ -191,7 +198,7 @@ input,select,textarea{font-family:inherit;outline:none;}
   <div class="topbar">
     <div class="topbar-title" id="topbar-title">Resumen</div>
     <div class="topbar-right">
-      <div class="sync-row"><span class="sync-dot"></span><span class="sync-lbl">En vivo</span></div>
+      <div class="sync-row"><span class="sync-dot" id="sync-dot"></span><span class="sync-lbl" id="sync-lbl">En vivo</span></div>
     </div>
   </div>
 
@@ -235,13 +242,18 @@ input,select,textarea{font-family:inherit;outline:none;}
           <input type="text" class="form-control" id="alta-prefijo" value="RCP"/>
         </div>
       </div>
-      <button class="btn btn-green" onclick="crearLoteEquipos()">Crear códigos</button>
+      <button class="btn btn-green" id="btn-crear-lote" onclick="crearLoteEquipos()">Crear códigos</button>
       <p class="form-hint">Genera códigos <span class="mono">PREFIJO-01</span>, <span class="mono">PREFIJO-02</span>… listos para repartir. Cada equipo rellena su nombre y selfie él mismo al entrar con el código.</p>
     </div>
 
     <div class="card">
       <div class="card-title">Códigos activos</div>
-      <div class="codigos-grid" id="codigos-grid"></div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Código</th><th>Nombre del equipo</th><th></th></tr></thead>
+          <tbody id="tbl-equipos"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -268,7 +280,7 @@ input,select,textarea{font-family:inherit;outline:none;}
         <label class="form-label">Nombre del evento</label>
         <input type="text" class="form-control" id="nueva-gynkana-nombre" value="Gynkana RCP — Pretemporada 2026/27"/>
       </div>
-      <button class="btn btn-primary" onclick="sembrarGynkana()">Crear gynkana y sembrar las 7 pruebas</button>
+      <button class="btn btn-primary" id="btn-sembrar" onclick="sembrarGynkana()">Crear gynkana y sembrar las 7 pruebas</button>
     </div>
 
     <div class="card" id="config-con-gynkana" style="display:none;margin-bottom:20px;">
@@ -433,9 +445,8 @@ function normalizarCodigo(v){
 
 /* ══════════ ARRANQUE: localizar (o no) la gynkana activa ══════════ */
 async function arrancar(){
-  const q = query(collection(db,'gynkanas'), where('activa','==',true), limit(1));
-  const snap = await getDocs(q);
-  if(snap.empty){
+  const gid = await buscarGynkanaActivaOrganizador();
+  if(!gid){
     gynkanaId = null;
     document.getElementById('config-sin-gynkana').style.display = 'block';
     document.getElementById('config-con-gynkana').style.display = 'none';
@@ -443,17 +454,37 @@ async function arrancar(){
     document.getElementById('enlace-equipos').textContent = '— crea la gynkana primero —';
     return;
   }
-  gynkanaId = snap.docs[0].id;
-  const data = snap.docs[0].data();
+  gynkanaId = gid.id;
+  const data = gid.data;
   document.getElementById('config-sin-gynkana').style.display = 'none';
   document.getElementById('config-con-gynkana').style.display = 'block';
   document.getElementById('config-nombre').value = data.nombre || '';
   document.getElementById('sb-gynkana-id').textContent = gynkanaId;
-  document.getElementById('enlace-equipos').textContent = location.origin + location.pathname.replace('gynkana-organizador.html','gynkana.html');
+  document.getElementById('enlace-equipos').textContent = location.origin + location.pathname.replace('gynkana-organizador.html','');
 
   await cargarPruebas();
   suscribirEquipos();
 }
+
+// Devuelve la MISMA gynkana activa que vería un equipo, incluso si por error
+// hay más de una marcada activa:true (no debería pasar, ver sembrarGynkana,
+// pero si pasa, ambas apps tienen que coincidir en cuál usan). No se usa
+// orderBy en la consulta a propósito — combinado con el where() exigiría
+// crear un índice compuesto en Firebase antes de poder probarlo, y con
+// pocos gynkanas activos ordenar en el cliente es más que suficiente.
+async function buscarGynkanaActivaOrganizador(){
+  const q = query(collection(db,'gynkanas'), where('activa','==',true), limit(5));
+  const snap = await getDocs(q);
+  if(snap.empty) return null;
+  const docs = snap.docs.map(d=>({id:d.id, data:d.data()}));
+  if(docs.length > 1){
+    console.warn('[Organizador] Hay más de una gynkana marcada como activa — usando la más reciente. Desactiva las demás en Configuración.', docs.map(d=>d.id));
+    showToast('⚠️ Hay más de una gynkana activa a la vez — revisa Configuración', 'err');
+  }
+  docs.sort((a,b)=> tsMillis(b.data.createdAt) - tsMillis(a.data.createdAt));
+  return docs[0];
+}
+function tsMillis(t){ return t && t.toMillis ? t.toMillis() : (t && t.seconds ? t.seconds*1000 : 0); }
 
 async function cargarPruebas(){
   const snap = await getDocs(collection(db,'gynkanas',gynkanaId,'pruebas'));
@@ -462,15 +493,24 @@ async function cargarPruebas(){
 }
 
 function suscribirEquipos(){
-  onSnapshot(collection(db,'gynkanas',gynkanaId,'equipos'), snap=>{
+  onSnapshot(collection(db,'gynkanas',gynkanaId,'equipos'), { includeMetadataChanges: true }, snap=>{
     equipos = snap.docs.map(d=>({id:d.id, ...d.data()}));
     pintarResumen();
     pintarCodigos();
+    marcarEstadoConexion(snap.metadata.fromCache);
   }, err=>{
     console.error('[Organizador] Error escuchando equipos', err);
     showToast('Error leyendo los equipos — revisa la consola', 'err');
+    marcarEstadoConexion(true);
   });
 }
+function marcarEstadoConexion(sinConexion){
+  const dot = document.getElementById('sync-dot'), lbl = document.getElementById('sync-lbl');
+  dot.classList.toggle('caida', sinConexion);
+  lbl.classList.toggle('caida', sinConexion);
+  lbl.textContent = sinConexion ? 'Sin conexión — datos no actualizados' : 'En vivo';
+}
+window.addEventListener('offline', ()=> marcarEstadoConexion(true));
 
 /* ══════════ RESUMEN ══════════ */
 function pintarResumen(){
@@ -534,14 +574,49 @@ window.confirmarLlegada = async function(){
 };
 
 /* ══════════ EQUIPOS / CÓDIGOS ══════════ */
+window.editandoNombreDe = null; // equipoId cuyo campo de nombre tiene el foco ahora mismo
 function pintarCodigos(){
-  document.getElementById('codigos-grid').innerHTML = equipos.map(e=>`
-    <div class="codigo-chip">
-      <span class="mono">${e.id}</span>
-      <button title="Copiar" onclick="copiarTexto('${e.id}')">📋</button>
-      <button title="Borrar equipo" onclick="borrarEquipo('${e.id}')">🗑️</button>
-    </div>`).join('') || `<p style="color:var(--faint);font-size:13px">Todavía no hay códigos creados.</p>`;
+  if(window.editandoNombreDe) return; // no pisar lo que se está escribiendo con un repintado en vivo
+  document.getElementById('tbl-equipos').innerHTML = equipos.map(e=>{
+    const nombre = e.nombre || '';
+    return `<tr>
+      <td class="mono">${e.id}</td>
+      <td>
+        <input class="tbl-nombre-input ${nombre?'':'sin-nombre'}" type="text"
+          value="${escaparAtributo(nombre)}" placeholder="Sin registrar todavía"
+          data-equipo-id="${e.id}"
+          onfocus="window.editandoNombreDe='${e.id}'"
+          onblur="window.editandoNombreDe=null; guardarNombreEquipo(this)"
+          onkeydown="if(event.key==='Enter') this.blur()">
+        <span class="tbl-guardado" id="guardado-${e.id}">Guardado</span>
+      </td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" title="Copiar código" onclick="copiarTexto('${e.id}')">📋</button>
+        <button class="btn btn-danger btn-sm" title="Borrar equipo" onclick="borrarEquipo('${e.id}')">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="3" style="text-align:center;color:var(--faint);padding:20px">Todavía no hay códigos creados.</td></tr>`;
 }
+function escaparAtributo(s){
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+window.guardarNombreEquipo = async function(input){
+  const equipoId = input.dataset.equipoId;
+  const nombre = input.value.trim();
+  input.classList.toggle('sin-nombre', !nombre);
+  try{
+    await updateDoc(doc(db,'gynkanas',gynkanaId,'equipos',equipoId), { nombre });
+    const marca = document.getElementById('guardado-'+equipoId);
+    if(marca){
+      marca.classList.add('show');
+      setTimeout(()=> marca.classList.remove('show'), 1600);
+    }
+    pintarCodigos(); // ahora que ya no está en foco, refleja el estado real
+  }catch(e){
+    console.error('[Organizador] Error guardando el nombre', e);
+    showToast('No se pudo guardar el nombre', 'err');
+  }
+};
 window.copiarTexto = function(t){
   navigator.clipboard?.writeText(t).then(()=> showToast('Copiado: ' + t, 'ok'))
     .catch(()=> showToast('No se pudo copiar', 'err'));
@@ -564,6 +639,8 @@ window.crearLoteEquipos = async function(){
   if(!gynkanaId){ showToast('Crea primero la gynkana en Configuración', 'err'); return; }
   const cantidad = Math.max(1, Math.min(30, parseInt(document.getElementById('alta-cantidad').value,10) || 1));
   const prefijo = normalizarCodigo(document.getElementById('alta-prefijo').value) || 'RCP';
+  const btn = document.getElementById('btn-crear-lote');
+  btn.disabled = true;
   const existentes = new Set(equipos.map(e=>e.id));
   let creados = 0;
   for(let i=1; i<=cantidad; i++){
@@ -571,9 +648,11 @@ window.crearLoteEquipos = async function(){
     // evita colisión si ya existen códigos con ese prefijo
     do{ codigo = `${prefijo}-${String(n).padStart(2,'0')}`; n++; } while(existentes.has(codigo));
     existentes.add(codigo);
+    btn.textContent = `Creando ${creados+1}/${cantidad}…`;
     await crearEquipo(codigo, true);
     creados++;
   }
+  btn.disabled = false; btn.textContent = 'Crear códigos';
   showToast(`${creados} equipos creados`, 'ok');
 };
 async function crearEquipo(codigo, silencioso){
@@ -661,7 +740,24 @@ window.guardarAjuste = async function(){
 /* ══════════ CONFIGURACIÓN / SIEMBRA ══════════ */
 window.sembrarGynkana = async function(){
   const nombre = document.getElementById('nueva-gynkana-nombre').value.trim() || 'Gynkana RCP';
+  const btn = document.getElementById('btn-sembrar');
+  btn.disabled = true; btn.textContent = 'Comprobando…';
   try{
+    // Evita el escenario "dos gynkanas activas a la vez": si dejaste una de
+    // prueba activa y creas otra, organizador y equipos podrían acabar
+    // viendo gynkanas distintas sin que nadie se dé cuenta.
+    const existente = await buscarGynkanaActivaOrganizador();
+    if(existente){
+      const seguir = confirm(
+        `Ya hay una gynkana activa: "${existente.data.nombre || existente.id}".\n\n` +
+        `Si creas otra ahora, la app de los equipos podría no coincidir con lo ` +
+        `que ves aquí hasta que desactives la primera.\n\n` +
+        `¿Desactivar "${existente.data.nombre || existente.id}" y crear la nueva?`
+      );
+      if(!seguir){ btn.disabled = false; btn.textContent = 'Crear gynkana y sembrar las 7 pruebas'; return; }
+      await updateDoc(doc(db,'gynkanas',existente.id), { activa:false, finTs: serverTimestamp() });
+    }
+    btn.textContent = 'Creando…';
     const gRef = doc(collection(db,'gynkanas'));
     await setDoc(gRef, { nombre, activa: true, inicioTs: null, finTs: null, createdAt: serverTimestamp() });
     const batch = writeBatch(db);
@@ -675,6 +771,8 @@ window.sembrarGynkana = async function(){
   }catch(e){
     console.error('[Organizador] Error sembrando la gynkana', e);
     showToast('No se pudo crear la gynkana', 'err');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Crear gynkana y sembrar las 7 pruebas';
   }
 };
 window.guardarNombreGynkana = async function(){

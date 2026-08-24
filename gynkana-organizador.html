@@ -243,7 +243,7 @@ input,select,textarea{font-family:inherit;outline:none;}
         </div>
       </div>
       <button class="btn btn-green" id="btn-crear-lote" onclick="crearLoteEquipos()">Crear códigos</button>
-      <p class="form-hint">Genera códigos <span class="mono">PREFIJO-01</span>, <span class="mono">PREFIJO-02</span>… listos para repartir. Cada equipo rellena su nombre y selfie él mismo al entrar con el código.</p>
+      <p class="form-hint">Genera códigos <span class="mono">PREFIJO01</span>, <span class="mono">PREFIJO02</span>… listos para repartir (sin guiones, para que se tecleen sin errores). Cada equipo rellena su nombre y selfie él mismo al entrar con el código.</p>
     </div>
 
     <div class="card">
@@ -312,7 +312,7 @@ input,select,textarea{font-family:inherit;outline:none;}
     <div class="modal-head"><h3>Añadir equipo</h3><button class="modal-close" onclick="cerrarModalEquipo()">✕</button></div>
     <div class="form-group">
       <label class="form-label">Código de equipo</label>
-      <input type="text" class="form-control" id="me-codigo" placeholder="RCP-99"/>
+      <input type="text" class="form-control" id="me-codigo" placeholder="RCP99"/>
       <p class="form-hint">Se guarda en mayúsculas y sin espacios. Es lo que teclea el equipo para entrar.</p>
     </div>
     <div class="modal-foot">
@@ -440,7 +440,7 @@ function showToast(msg, tipo){
 }
 
 function normalizarCodigo(v){
-  return (v||'').trim().toUpperCase().replace(/\s+/g,'');
+  return (v||'').trim().toUpperCase().replace(/[\s-]+/g,'');
 }
 
 /* ══════════ ARRANQUE: localizar (o no) la gynkana activa ══════════ */
@@ -646,7 +646,7 @@ window.crearLoteEquipos = async function(){
   for(let i=1; i<=cantidad; i++){
     let n = i, codigo;
     // evita colisión si ya existen códigos con ese prefijo
-    do{ codigo = `${prefijo}-${String(n).padStart(2,'0')}`; n++; } while(existentes.has(codigo));
+    do{ codigo = `${prefijo}${String(n).padStart(2,'0')}`; n++; } while(existentes.has(codigo));
     existentes.add(codigo);
     btn.textContent = `Creando ${creados+1}/${cantidad}…`;
     await crearEquipo(codigo, true);

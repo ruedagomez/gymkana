@@ -188,6 +188,12 @@ input{font-family:inherit;touch-action:manipulation;}
 .opt:not(.sel):before{content:'○';color:var(--bdr);font-size:11px;}
 .nota{font-size:12.5px;color:var(--mid);text-align:center;margin-top:14px;line-height:1.4;}
 .cta.deshacer{background:none;color:var(--mid);border:1.5px solid var(--bdr);}
+.link-secundario{
+  display:flex;align-items:center;justify-content:center;width:100%;min-height:var(--tap);
+  margin-top:4px;font-family:'Barlow Condensed',sans-serif;font-size:11.5px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--mid);text-decoration:underline;
+  text-underline-offset:2px;
+}
 
 /* ---------- Ranking overlay ---------- */
 .ranking-panel{
@@ -211,6 +217,8 @@ input{font-family:inherit;touch-action:manipulation;}
 .rk-estado{font-size:11.5px;color:var(--mid);}
 .rk-badge{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--r);font-weight:500;flex-shrink:0;}
 .rk-badge.llegada{color:var(--fit);}
+
+#ranking-panel > .link-secundario{padding-bottom:calc(14px + var(--bottom));flex-shrink:0;background:var(--bg);border-top:1px solid var(--bdr);}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 </style>
@@ -271,6 +279,7 @@ input{font-family:inherit;touch-action:manipulation;}
     </div>
     <p class="err" id="err-registro">Falta el nombre o la selfie del equipo.</p>
     <button class="cta" id="btn-registrar" disabled>Empezar la gynkana</button>
+    <button class="link-secundario" id="btn-no-es-mi-equipo" type="button">¿Código equivocado? Volver a escribirlo</button>
   </div>
 
   <!-- ============ PANTALLA: ERROR / SIN CONEXIÓN A GYNKANA ACTIVA ============ -->
@@ -326,6 +335,7 @@ input{font-family:inherit;touch-action:manipulation;}
     <button class="ranking-cerrar" id="cerrar-ranking" type="button">✕</button>
   </div>
   <div class="ranking-lista" id="ranking-lista"></div>
+  <button class="link-secundario" id="btn-cambiar-equipo" type="button">¿Os habéis equivocado de código? Cambiar de equipo</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
@@ -375,7 +385,14 @@ async function subirACloudinary(file){
   fd.append('upload_preset', PRESET);
   fd.append('folder', 'racing-lab/gynkana');
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`, { method:'POST', body:fd });
-  if(!res.ok) throw new Error('Cloudinary respondió ' + res.status);
+  if(!res.ok){
+    let detalle = '';
+    try{ detalle = (await res.json())?.error?.message || ''; }catch(e){}
+    const err = new Error('Cloudinary respondió ' + res.status + (detalle ? ': ' + detalle : ''));
+    err.esErrorCloudinary = true;
+    err.status = res.status;
+    throw err;
+  }
   const data = await res.json();
   if(!data.secure_url) throw new Error('Cloudinary no devolvió una URL');
   return data.secure_url;
@@ -501,9 +518,17 @@ document.getElementById('btn-entrar').onclick = async ()=>{
 };
 
 async function buscarGynkanaActiva(){
-  const q = query(collection(db,'gynkanas'), where('activa','==',true), limit(1));
+  const q = query(collection(db,'gynkanas'), where('activa','==',true), limit(5));
   const snap = await getDocs(q);
-  return snap.empty ? null : snap.docs[0].id;
+  if(snap.empty) return null;
+  const docs = snap.docs.map(d=>({id:d.id, data:d.data()}));
+  if(docs.length > 1){
+    console.warn('[Gynkana] Hay más de una gynkana activa a la vez — usando la más reciente.', docs.map(d=>d.id));
+  }
+  // tsNum() está definida más abajo (se usa también en el ranking), pero
+  // al ser una function declaration queda "hoisted" y ya se puede llamar aquí.
+  docs.sort((a,b)=> tsNum(b.data.createdAt) - tsNum(a.data.createdAt));
+  return docs[0].id;
 }
 
 async function cargarPruebas(){
@@ -578,7 +603,9 @@ document.getElementById('btn-registrar').onclick = async ()=>{
     // el propio onSnapshot recibirá el cambio y pasará a la pantalla principal
   }catch(e){
     console.error('[Gynkana] Error al registrar el equipo', e);
-    errEl.textContent = 'No se pudo subir la selfie. Revisad la conexión e intentadlo de nuevo.';
+    errEl.textContent = e.esErrorCloudinary
+      ? `No se pudo subir la selfie (error ${e.status}). Decídselo al organizador con este número e intentadlo de nuevo.`
+      : 'No se pudo subir la selfie. Revisad la conexión e intentadlo de nuevo.';
     errEl.classList.add('show');
     btn.disabled = false; btn.textContent = 'Empezar la gynkana';
   }
@@ -766,6 +793,21 @@ function cerrarRanking(){
   rankingPanel.classList.remove('on');
   document.body.classList.remove('bloqueado');
 }
+function cambiarDeEquipo(){
+  if(!confirm('¿Salir de este equipo y volver a escribir un código? La cartilla de este equipo no se borra, solo dejáis de estar en este móvil.')) return;
+  if(unsubEquipo) { unsubEquipo(); unsubEquipo = null; }
+  if(unsubRanking) { unsubRanking(); unsubRanking = null; }
+  localStorage.removeItem(CLAVE_SESION);
+  gynkanaId = null; equipoId = null; equipoData = null;
+  selfieBlob = null;
+  cerrarRanking();
+  document.getElementById('in-codigo').value = '';
+  document.getElementById('err-codigo').classList.remove('show');
+  mostrar('p-codigo');
+  document.getElementById('in-codigo').focus();
+}
+document.getElementById('btn-no-es-mi-equipo').onclick = cambiarDeEquipo;
+document.getElementById('btn-cambiar-equipo').onclick = cambiarDeEquipo;
 function suscribirRanking(){
   if(unsubRanking) return; // ya suscrito, se mantiene mientras dure la sesión
   unsubRanking = onSnapshot(collection(db,'gynkanas',gynkanaId,'equipos'), snap=>{

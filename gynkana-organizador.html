@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Gynkana · Organizador · Racing Lab</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --r:#e8192c;--r2:rgba(232,25,44,.09);--r3:rgba(232,25,44,.2);
+  --blk:#0b0b0b;--txt:#111;--mid:#6b6b6b;--faint:#b0b0b0;
+  --bdr:#e2e2e2;--bg:#f3f3f1;--wh:#fff;
+  --fit:#15803d;--fit-bg:#f0fdf4;
+  --warn:#c2410c;--warn-bg:#fff7ed;
+  --sidebar:240px;
+}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--bg);color:var(--txt);}
+button{font-family:inherit;cursor:pointer;border:none;outline:none;}
+input,select,textarea{font-family:inherit;outline:none;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes dot{0%,100%{opacity:1}50%{opacity:.3}}
+
+.app{display:flex;height:100vh;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar);flex-shrink:0;background:var(--blk);display:flex;flex-direction:column;position:relative;z-index:10;border-right:3px solid var(--r);}
+.sidebar::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.03) 1px,transparent 1px);background-size:22px 22px;}
+.sb-brand{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,.07);position:relative;z-index:1;}
+.sb-back{display:flex;align-items:center;gap:6px;margin-bottom:16px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.28);text-transform:uppercase;background:none;border:none;padding:0;transition:color .2s;}
+.sb-back:hover{color:var(--r);}
+.sb-back svg{width:10px;height:10px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+.sb-name{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--wh);letter-spacing:.5px;line-height:1;}
+.sb-name span{color:var(--r);}
+.sb-sub{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;color:rgba(255,255,255,.25);text-transform:uppercase;margin-top:4px;}
+.sb-nav{flex:1;padding:12px 10px;overflow-y:auto;position:relative;z-index:1;}
+.sb-section{font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,.2);text-transform:uppercase;padding:14px 10px 5px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:4px;cursor:pointer;transition:all .18s;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.04em;color:rgba(255,255,255,.4);margin-bottom:1px;border-left:2px solid transparent;}
+.nav-item:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);}
+.nav-item.active{background:rgba(232,25,44,.12);color:var(--wh);border-left-color:var(--r);}
+.nav-icon{width:18px;text-align:center;font-size:13px;flex-shrink:0;}
+.nav-badge{margin-left:auto;font-size:9px;background:var(--r);color:var(--wh);padding:2px 6px;border-radius:10px;font-weight:700;}
+.sb-foot{padding:14px 18px;border-top:1px solid rgba(255,255,255,.07);position:relative;z-index:1;}
+.sb-foot-txt{font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.2);}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+.topbar{height:58px;background:var(--wh);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;padding:0 36px;flex-shrink:0;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.topbar-title{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:900;letter-spacing:.1em;color:var(--txt);text-transform:uppercase;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--fit);animation:dot 2s infinite;flex-shrink:0;}
+.sync-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mid);}
+.sync-row{display:flex;align-items:center;gap:6px;}
+
+.page{display:none;padding:32px 36px 48px;animation:fadeUp .3s ease;}
+.page.active{display:block;}
+
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid var(--bdr);flex-wrap:wrap;gap:10px;}
+.st{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:900;letter-spacing:.1em;color:var(--txt);text-transform:uppercase;}
+.sc{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);}
+.card{background:var(--wh);border:1px solid var(--bdr);border-radius:6px;padding:20px;}
+.card-title{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--mid);margin-bottom:14px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+.kpi{background:var(--wh);border:1px solid var(--bdr);border-radius:6px;padding:16px;border-left:3px solid transparent;transition:border-color .2s;}
+.kpi:hover{border-left-color:var(--r);}
+.kv{font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--txt);line-height:1;}
+.kv.red{color:var(--r);}.kv.green{color:var(--fit);}
+.kl{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mid);margin-top:3px;}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 15px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;transition:all .18s;cursor:pointer;border:none;}
+.btn-primary{background:var(--r);color:var(--wh);}
+.btn-primary:hover{background:#c8151f;box-shadow:0 4px 12px var(--r3);}
+.btn-primary:disabled{background:var(--faint);box-shadow:none;cursor:default;}
+.btn-ghost{background:transparent;border:1.5px solid var(--bdr);color:var(--mid);}
+.btn-ghost:hover{border-color:var(--r);color:var(--r);}
+.btn-green{background:var(--fit);color:var(--wh);}
+.btn-green:hover{background:#126a34;}
+.btn-danger{background:transparent;border:1.5px solid rgba(220,38,38,.25);color:#dc2626;}
+.btn-danger:hover{background:#fef2f2;}
+.btn-sm{padding:5px 11px;font-size:11px;}
+
+.pill{display:inline-flex;align-items:center;gap:4px;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.1em;padding:3px 8px;border-radius:2px;text-transform:uppercase;}
+.pill-green{background:var(--fit-bg);color:var(--fit);}
+.pill-red{background:#fef2f2;color:#dc2626;}
+.pill-amber{background:var(--warn-bg);color:var(--warn);}
+.pill-gray{background:#f5f5f5;color:var(--mid);}
+
+.tbl-wrap{overflow-x:auto;}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{padding:9px 12px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);border-bottom:1.5px solid var(--bdr);background:var(--wh);white-space:nowrap;}
+.tbl td{padding:9px 12px;border-bottom:1px solid rgba(226,226,226,.6);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(232,25,44,.025);}
+.tbl .nm{font-weight:600;}
+.tbl-foto{width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--bg);display:block;border:1px solid var(--bdr);}
+.tbl-foto-vacia{width:32px;height:32px;border-radius:50%;background:var(--bg);border:1px dashed var(--bdr);}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px;}
+.progreso-mini{display:flex;align-items:center;gap:6px;}
+.progreso-track{width:60px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;}
+.progreso-fill{height:100%;background:var(--r);border-radius:3px;}
+.progreso-fill.completa{background:var(--fit);}
+
+.form-group{margin-bottom:14px;}
+.form-label{display:block;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--mid);margin-bottom:6px;}
+.form-control{width:100%;background:var(--bg);border:1.5px solid var(--bdr);border-radius:4px;color:var(--txt);padding:9px 12px;font-size:13px;transition:border-color .18s;}
+.form-control:focus{border-color:var(--r);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-hint{font-size:11.5px;color:var(--faint);margin-top:5px;line-height:1.4;}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+.overlay.open{display:flex;}
+.modal{background:var(--wh);border:1px solid var(--bdr);border-radius:8px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:28px;box-shadow:0 24px 60px rgba(0,0,0,.15);}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--bdr);}
+.modal-head h3{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;}
+.modal-close{background:none;border:none;font-size:22px;color:var(--faint);cursor:pointer;padding:0;}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--bdr);}
+
+.toast{position:fixed;bottom:28px;right:28px;background:var(--blk);color:var(--wh);padding:12px 18px 12px 14px;border-radius:4px;border-left:3px solid var(--r);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;z-index:1000;box-shadow:0 8px 24px rgba(0,0,0,.2);display:flex;align-items:center;gap:8px;animation:fadeUp .3s ease;transform:translateY(200%);transition:transform .25s;}
+.toast.show{transform:translateY(0);}
+.toast.ok{border-left-color:var(--fit);}
+.toast.err{border-left-color:#dc2626;}
+
+/* CÓDIGOS */
+.codigos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.codigo-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--bdr);border-radius:5px;padding:9px 11px;}
+.codigo-chip .mono{font-weight:700;color:var(--txt);}
+.codigo-chip button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:14px;}
+.codigo-chip button:hover{color:var(--r);}
+
+/* AJUSTAR SITIOS */
+.ajuste-layout{display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;}
+#mapa-ajuste{height:520px;border-radius:6px;border:1px solid var(--bdr);}
+.ajuste-sidebar{background:var(--wh);border:1px solid var(--bdr);border-radius:6px;padding:16px;position:sticky;top:74px;max-height:520px;overflow-y:auto;}
+.ajuste-item{padding:9px 0;border-bottom:1px solid var(--bdr);}
+.ajuste-item:last-child{border-bottom:none;}
+.ajuste-item-titulo{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12.5px;color:var(--txt);margin-bottom:2px;}
+.ajuste-item-sitio{font-size:11px;color:var(--mid);}
+.pin-organizador{width:30px;height:30px;border-radius:50%;background:var(--blk);border:2px solid #fff;display:grid;place-items:center;color:#fff;font-family:'Bebas Neue',sans-serif;font-size:14px;box-shadow:0 3px 8px rgba(0,0,0,.35);}
+
+.mobnav{display:none;}
+@media(max-width:980px){
+  .sidebar{display:none;}
+  .ajuste-layout{grid-template-columns:1fr;}
+  .mobnav{
+    display:flex;position:fixed;left:0;right:0;bottom:0;z-index:80;
+    background:#101014;border-top:1px solid rgba(255,255,255,.08);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .mobnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 4px 8px;color:rgba(255,255,255,.45);border-top:2px solid transparent;}
+  .mobnav-item .nav-icon{font-size:16px;}
+  .mobnav-item small{font-family:'Barlow Condensed',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;}
+  .mobnav-item.active{color:#fff;border-top-color:var(--r);}
+  .main{padding-bottom:64px;}
+}
+@media(max-width:600px){.page{padding:18px 14px 36px;}.topbar{padding:0 16px;}.form-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <button class="sb-back" onclick="window.location.href='index.html'">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Volver al Lab
+    </button>
+    <div class="sb-name">RACING <span>LAB</span></div>
+    <div class="sb-sub">Gynkana · Organizador</div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">Evento</div>
+    <div class="nav-item active" onclick="nav('p-resumen',this)"><span class="nav-icon">📋</span>Resumen</div>
+    <div class="nav-item" onclick="nav('p-equipos',this)"><span class="nav-icon">🏷️</span>Equipos</div>
+    <div class="nav-item" onclick="nav('p-ajustar',this)"><span class="nav-icon">📍</span>Ajustar sitios</div>
+    <div class="nav-item" onclick="nav('p-config',this)"><span class="nav-icon">⚙️</span>Configuración</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="sb-foot-txt" id="sb-gynkana-id">sin gynkana activa</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbar-title">Resumen</div>
+    <div class="topbar-right">
+      <div class="sync-row"><span class="sync-dot"></span><span class="sync-lbl">En vivo</span></div>
+    </div>
+  </div>
+
+  <!-- ══ RESUMEN ══ -->
+  <div class="page active" id="p-resumen">
+    <div class="sh"><div class="st">Resumen en vivo</div><div class="sc" id="resumen-count">— equipos</div></div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kv" id="kpi-equipos">0</div><div class="kl">Equipos</div></div>
+      <div class="kpi"><div class="kv red" id="kpi-sellos">0</div><div class="kl">Sellos totales</div></div>
+      <div class="kpi"><div class="kv green" id="kpi-llegados">0</div><div class="kl">En la meta</div></div>
+      <div class="kpi"><div class="kv" id="kpi-completos">0</div><div class="kl">Cartillas completas</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Equipos</div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th></th><th>Equipo</th><th>Código</th><th>Progreso</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tbl-resumen"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ EQUIPOS ══ -->
+  <div class="page" id="p-equipos">
+    <div class="sh"><div class="st">Equipos y códigos</div>
+      <button class="btn btn-primary" onclick="abrirModalEquipo()">+ Añadir equipo</button>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Alta rápida</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cuántos equipos</label>
+          <input type="number" class="form-control" id="alta-cantidad" value="5" min="1" max="30"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prefijo del código</label>
+          <input type="text" class="form-control" id="alta-prefijo" value="RCP"/>
+        </div>
+      </div>
+      <button class="btn btn-green" onclick="crearLoteEquipos()">Crear códigos</button>
+      <p class="form-hint">Genera códigos <span class="mono">PREFIJO-01</span>, <span class="mono">PREFIJO-02</span>… listos para repartir. Cada equipo rellena su nombre y selfie él mismo al entrar con el código.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Códigos activos</div>
+      <div class="codigos-grid" id="codigos-grid"></div>
+    </div>
+  </div>
+
+  <!-- ══ AJUSTAR SITIOS ══ -->
+  <div class="page" id="p-ajustar">
+    <div class="sh"><div class="st">Ajustar coordenadas</div>
+      <button class="btn btn-primary" id="btn-guardar-ajuste" onclick="guardarAjuste()">Guardar coordenadas</button>
+    </div>
+    <p class="form-hint" style="margin-bottom:16px;">Arrastra cada pin a su sitio real. Las coordenadas del brief son aproximadas — La Palmera, la sede de la Grada y los cuatro patrocinadores se pusieron a ojo. Guarda cuando termines; los equipos las ven en cuanto se guardan.</p>
+    <div class="ajuste-layout">
+      <div id="mapa-ajuste"></div>
+      <div class="ajuste-sidebar" id="ajuste-lista"></div>
+    </div>
+  </div>
+
+  <!-- ══ CONFIGURACIÓN ══ -->
+  <div class="page" id="p-config">
+    <div class="sh"><div class="st">Configuración</div></div>
+
+    <div class="card" style="margin-bottom:20px;" id="config-sin-gynkana">
+      <div class="card-title">Crear la gynkana</div>
+      <p class="form-hint" style="margin-bottom:14px;">No hay ninguna gynkana activa todavía. Esto siembra el documento del evento y las siete pruebas del brief (Palmera, Socio, Grada, Alcalde, Balón, Patrocinador, Abastos). Es seguro pulsarlo una sola vez.</p>
+      <div class="form-group">
+        <label class="form-label">Nombre del evento</label>
+        <input type="text" class="form-control" id="nueva-gynkana-nombre" value="Gynkana RCP — Pretemporada 2026/27"/>
+      </div>
+      <button class="btn btn-primary" onclick="sembrarGynkana()">Crear gynkana y sembrar las 7 pruebas</button>
+    </div>
+
+    <div class="card" id="config-con-gynkana" style="display:none;margin-bottom:20px;">
+      <div class="card-title">Gynkana activa</div>
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input type="text" class="form-control" id="config-nombre" />
+      </div>
+      <button class="btn btn-ghost" onclick="guardarNombreGynkana()">Guardar nombre</button>
+      <button class="btn btn-danger" onclick="desactivarGynkana()" style="margin-left:8px;">Desactivar evento</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Enlace para los equipos</div>
+      <p class="form-hint" style="margin-bottom:10px;">Compartid este enlace (o su QR) con todos los equipos. Cada uno introduce su propio código al entrar.</p>
+      <div class="codigo-chip" style="max-width:420px;">
+        <span class="mono" id="enlace-equipos">—</span>
+        <button onclick="copiarEnlace()">📋</button>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
+<!-- MODAL: añadir equipo individual -->
+<div class="overlay" id="modal-equipo">
+  <div class="modal">
+    <div class="modal-head"><h3>Añadir equipo</h3><button class="modal-close" onclick="cerrarModalEquipo()">✕</button></div>
+    <div class="form-group">
+      <label class="form-label">Código de equipo</label>
+      <input type="text" class="form-control" id="me-codigo" placeholder="RCP-99"/>
+      <p class="form-hint">Se guarda en mayúsculas y sin espacios. Es lo que teclea el equipo para entrar.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="cerrarModalEquipo()">Cancelar</button>
+      <button class="btn btn-primary" onclick="crearEquipoIndividual()">Crear equipo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: marcar llegada -->
+<div class="overlay" id="modal-llegada">
+  <div class="modal">
+    <div class="modal-head"><h3>Marcar llegada</h3><button class="modal-close" onclick="cerrarModalLlegada()">✕</button></div>
+    <p class="form-hint" style="margin-bottom:14px;" id="llegada-equipo-nombre"></p>
+    <div class="form-group">
+      <label class="form-label">Revisado por</label>
+      <input type="text" class="form-control" id="llegada-revisor" placeholder="Tu nombre"/>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="cerrarModalLlegada()">Cancelar</button>
+      <button class="btn btn-green" onclick="confirmarLlegada()">Confirmar llegada</button>
+    </div>
+  </div>
+</div>
+
+<div class="mobnav">
+  <div class="mobnav-item active" onclick="nav('p-resumen',this)"><span class="nav-icon">📋</span><small>Resumen</small></div>
+  <div class="mobnav-item" onclick="nav('p-equipos',this)"><span class="nav-icon">🏷️</span><small>Equipos</small></div>
+  <div class="mobnav-item" onclick="nav('p-ajustar',this)"><span class="nav-icon">📍</span><small>Sitios</small></div>
+  <div class="mobnav-item" onclick="nav('p-config',this)"><span class="nav-icon">⚙️</span><small>Config</small></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot,
+  collection, getDocs, query, where, limit, writeBatch, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ══════════ FIREBASE ══════════
+   Ojo: esta consola NO inicia sesión de Firebase Auth a propósito
+   (igual que el resto de Racing Lab). Las reglas de firestore-gynkana.rules
+   usan justo eso — "sin auth" — para reconocer al organizador frente a
+   los equipos, que sí entran con auth anónima. No añadas signInAnonymously
+   aquí o los equipos y el organizador se volverán indistinguibles. */
+const app = initializeApp({
+  apiKey:"AIzaSyBNDylPVfge6SFXVfJAcna9v7qh_CffI7Y",
+  authDomain:"racing-portuense-scouting.firebaseapp.com",
+  projectId:"racing-portuense-scouting",
+  storageBucket:"racing-portuense-scouting.firebasestorage.app",
+  messagingSenderId:"1073919975511",
+  appId:"1:1073919975511:web:7c7f59495d1f67f6f44312"
+});
+const db = getFirestore(app);
+
+/* ══════════ LAS SIETE PRUEBAS (contenido definitivo del brief) ══════════
+   Coordenadas aproximadas — corregir desde "Ajustar sitios" antes del evento. */
+const PRUEBAS_SEED = [
+  { id:'palmera', orden:1, titulo:'Anuncio para La Palmera',
+    brief:'La Venta La Palmera quiere llenar el comedor. Inventaos un eslogan publicitario para el restaurante y grabad el anuncio allí mismo. Que dé hambre.',
+    sitios:[{n:'Venta La Palmera', lat:36.5861, lng:-6.2214}] },
+  { id:'socio', orden:2, titulo:'Un socio, un carnet, un himno',
+    brief:'Buscad un socio del Racing por el centro. Que enseñe su carnet a cámara y cante con vosotros un trozo del himno. Sin socio no hay sello.',
+    sitios:[{n:'Centro del Puerto', lat:36.5943, lng:-6.2326}] },
+  { id:'grada', orden:3, titulo:'Cantar en la sede de la Grada',
+    brief:'Id a la sede de la Grada de Animación y cantad con ellos. Grabadlo. Cuantas más voces se oigan, mejor.',
+    sitios:[{n:'Sede Grada de Animación', lat:36.5889, lng:-6.2141}] },
+  { id:'alcalde', orden:4, titulo:'Saludo en el Ayuntamiento',
+    brief:'Pasad por el Ayuntamiento a saludar al alcalde. Foto del saludo. Si no está, vale con quien os reciba — pero decid quién es.',
+    sitios:[{n:'Ayuntamiento', lat:36.5936, lng:-6.2299}] },
+  { id:'balon', orden:5, titulo:'Ejercicio con balón',
+    brief:'Un ejercicio con balón en un sitio emblemático del Puerto. Elegid uno de los seis.',
+    sitios:[
+      {n:'Castillo de San Marcos', lat:36.5940, lng:-6.2334},
+      {n:'Plaza de España', lat:36.5947, lng:-6.2313},
+      {n:'Plaza de Toros', lat:36.5985, lng:-6.2290},
+      {n:'Romerijo', lat:36.5955, lng:-6.2345},
+      {n:'Bar Beti', lat:36.5949, lng:-6.2318},
+      {n:'Bar Chino', lat:36.5938, lng:-6.2308}
+    ]},
+  { id:'patro', orden:6, titulo:'Foto con un patrocinador',
+    brief:'Foto del equipo en uno de nuestros patrocinadores. Que se lea bien el nombre del negocio.',
+    sitios:[
+      {n:'Cohebu', lat:36.5928, lng:-6.2280},
+      {n:'Inmobiliaria Guadalete', lat:36.5951, lng:-6.2301},
+      {n:'Datono', lat:36.5960, lng:-6.2287},
+      {n:'Bar Apolo', lat:36.5945, lng:-6.2338}
+    ]},
+  { id:'abastos', orden:7, titulo:'Un turno en la Plaza de Abastos',
+    brief:'Id a la Plaza de Abastos y echad una mano vendiendo en un puesto de fruta, pescado o carne. Grabad el momento con el vendedor.',
+    sitios:[{n:'Plaza de Abastos', lat:36.5946, lng:-6.2318}] }
+];
+
+/* ══════════ ESTADO ══════════ */
+let gynkanaId = null;
+let pruebas = [];
+let equipos = [];
+let equipoLlegadaObjetivo = null;
+
+/* ══════════ NAV ══════════ */
+window.nav = function(id, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-item, .mobnav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll(`[onclick*="'${id}'"]`).forEach(n=>n.classList.add('active'));
+  const titles = {'p-resumen':'Resumen','p-equipos':'Equipos','p-ajustar':'Ajustar sitios','p-config':'Configuración'};
+  document.getElementById('topbar-title').textContent = titles[id] || '';
+  if(id === 'p-ajustar') setTimeout(()=> mapaAjuste && mapaAjuste.invalidateSize(), 50);
+};
+
+/* ══════════ TOAST ══════════ */
+let toastTimer = null;
+function showToast(msg, tipo){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (tipo ? ' '+tipo : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+
+function normalizarCodigo(v){
+  return (v||'').trim().toUpperCase().replace(/\s+/g,'');
+}
+
+/* ══════════ ARRANQUE: localizar (o no) la gynkana activa ══════════ */
+async function arrancar(){
+  const q = query(collection(db,'gynkanas'), where('activa','==',true), limit(1));
+  const snap = await getDocs(q);
+  if(snap.empty){
+    gynkanaId = null;
+    document.getElementById('config-sin-gynkana').style.display = 'block';
+    document.getElementById('config-con-gynkana').style.display = 'none';
+    document.getElementById('sb-gynkana-id').textContent = 'sin gynkana activa';
+    document.getElementById('enlace-equipos').textContent = '— crea la gynkana primero —';
+    return;
+  }
+  gynkanaId = snap.docs[0].id;
+  const data = snap.docs[0].data();
+  document.getElementById('config-sin-gynkana').style.display = 'none';
+  document.getElementById('config-con-gynkana').style.display = 'block';
+  document.getElementById('config-nombre').value = data.nombre || '';
+  document.getElementById('sb-gynkana-id').textContent = gynkanaId;
+  document.getElementById('enlace-equipos').textContent = location.origin + location.pathname.replace('gynkana-organizador.html','gynkana.html');
+
+  await cargarPruebas();
+  suscribirEquipos();
+}
+
+async function cargarPruebas(){
+  const snap = await getDocs(collection(db,'gynkanas',gynkanaId,'pruebas'));
+  pruebas = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>(a.orden||0)-(b.orden||0));
+  pintarAjuste();
+}
+
+function suscribirEquipos(){
+  onSnapshot(collection(db,'gynkanas',gynkanaId,'equipos'), snap=>{
+    equipos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    pintarResumen();
+    pintarCodigos();
+  }, err=>{
+    console.error('[Organizador] Error escuchando equipos', err);
+    showToast('Error leyendo los equipos — revisa la consola', 'err');
+  });
+}
+
+/* ══════════ RESUMEN ══════════ */
+function pintarResumen(){
+  const total = pruebas.length || 7;
+  document.getElementById('resumen-count').textContent = equipos.length + ' equipos';
+  document.getElementById('kpi-equipos').textContent = equipos.length;
+  document.getElementById('kpi-sellos').textContent = equipos.reduce((a,e)=>a+Object.keys(e.completadas||{}).length,0);
+  document.getElementById('kpi-llegados').textContent = equipos.filter(e=>e.llegadaTs).length;
+  document.getElementById('kpi-completos').textContent = equipos.filter(e=>Object.keys(e.completadas||{}).length>=total).length;
+
+  const ordenados = [...equipos].sort((a,b)=>{
+    const ca = Object.keys(a.completadas||{}).length, cb = Object.keys(b.completadas||{}).length;
+    if(!!a.llegadaTs !== !!b.llegadaTs) return a.llegadaTs ? -1 : 1;
+    return cb - ca;
+  });
+
+  document.getElementById('tbl-resumen').innerHTML = ordenados.map(e=>{
+    const n = Object.keys(e.completadas||{}).length;
+    const pct = total ? Math.round(n/total*100) : 0;
+    const completa = n >= total;
+    const foto = e.selfieUrl ? `<img class="tbl-foto" src="${e.selfieUrl}">` : `<div class="tbl-foto-vacia"></div>`;
+    let estadoPill;
+    if(e.llegadaTs) estadoPill = `<span class="pill pill-green">En la meta</span>`;
+    else if(!e.nombre) estadoPill = `<span class="pill pill-gray">Sin registrar</span>`;
+    else estadoPill = `<span class="pill ${completa?'pill-amber':'pill-gray'}">${completa?'Cartilla completa':'En ruta'}</span>`;
+    const accion = e.llegadaTs
+      ? `<span class="mono" style="color:var(--faint)">✓</span>`
+      : `<button class="btn btn-green btn-sm" onclick="abrirModalLlegada('${e.id}')">Marcar llegada</button>`;
+    return `<tr>
+      <td>${foto}</td>
+      <td class="nm">${e.nombre || '<span style="color:var(--faint)">— sin registrar —</span>'}</td>
+      <td class="mono">${e.id}</td>
+      <td><div class="progreso-mini"><div class="progreso-track"><div class="progreso-fill ${completa?'completa':''}" style="width:${pct}%"></div></div><span class="mono" style="font-size:11px">${n}/${total}</span></div></td>
+      <td>${estadoPill}</td>
+      <td>${accion}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--faint);padding:24px">Sin equipos todavía — dalos de alta en la pestaña Equipos.</td></tr>`;
+}
+
+/* ══════════ MARCAR LLEGADA ══════════ */
+window.abrirModalLlegada = function(equipoId){
+  equipoLlegadaObjetivo = equipoId;
+  const e = equipos.find(x=>x.id===equipoId);
+  document.getElementById('llegada-equipo-nombre').textContent = `Equipo: ${e ? (e.nombre||e.id) : equipoId}`;
+  document.getElementById('llegada-revisor').value = '';
+  document.getElementById('modal-llegada').classList.add('open');
+};
+window.cerrarModalLlegada = function(){ document.getElementById('modal-llegada').classList.remove('open'); };
+window.confirmarLlegada = async function(){
+  const revisor = document.getElementById('llegada-revisor').value.trim() || 'Organizador';
+  try{
+    await updateDoc(doc(db,'gynkanas',gynkanaId,'equipos',equipoLlegadaObjetivo), {
+      llegadaTs: serverTimestamp(), revisadoPor: revisor
+    });
+    showToast('Llegada registrada', 'ok');
+    cerrarModalLlegada();
+  }catch(e){
+    console.error('[Organizador] Error marcando llegada', e);
+    showToast('No se pudo guardar la llegada', 'err');
+  }
+};
+
+/* ══════════ EQUIPOS / CÓDIGOS ══════════ */
+function pintarCodigos(){
+  document.getElementById('codigos-grid').innerHTML = equipos.map(e=>`
+    <div class="codigo-chip">
+      <span class="mono">${e.id}</span>
+      <button title="Copiar" onclick="copiarTexto('${e.id}')">📋</button>
+      <button title="Borrar equipo" onclick="borrarEquipo('${e.id}')">🗑️</button>
+    </div>`).join('') || `<p style="color:var(--faint);font-size:13px">Todavía no hay códigos creados.</p>`;
+}
+window.copiarTexto = function(t){
+  navigator.clipboard?.writeText(t).then(()=> showToast('Copiado: ' + t, 'ok'))
+    .catch(()=> showToast('No se pudo copiar', 'err'));
+};
+window.copiarEnlace = function(){ copiarTexto(document.getElementById('enlace-equipos').textContent); };
+
+window.abrirModalEquipo = function(){
+  document.getElementById('me-codigo').value = '';
+  document.getElementById('modal-equipo').classList.add('open');
+};
+window.cerrarModalEquipo = function(){ document.getElementById('modal-equipo').classList.remove('open'); };
+window.crearEquipoIndividual = async function(){
+  if(!gynkanaId){ showToast('Crea primero la gynkana en Configuración', 'err'); return; }
+  const codigo = normalizarCodigo(document.getElementById('me-codigo').value);
+  if(!codigo){ showToast('Escribe un código', 'err'); return; }
+  await crearEquipo(codigo);
+  cerrarModalEquipo();
+};
+window.crearLoteEquipos = async function(){
+  if(!gynkanaId){ showToast('Crea primero la gynkana en Configuración', 'err'); return; }
+  const cantidad = Math.max(1, Math.min(30, parseInt(document.getElementById('alta-cantidad').value,10) || 1));
+  const prefijo = normalizarCodigo(document.getElementById('alta-prefijo').value) || 'RCP';
+  const existentes = new Set(equipos.map(e=>e.id));
+  let creados = 0;
+  for(let i=1; i<=cantidad; i++){
+    let n = i, codigo;
+    // evita colisión si ya existen códigos con ese prefijo
+    do{ codigo = `${prefijo}-${String(n).padStart(2,'0')}`; n++; } while(existentes.has(codigo));
+    existentes.add(codigo);
+    await crearEquipo(codigo, true);
+    creados++;
+  }
+  showToast(`${creados} equipos creados`, 'ok');
+};
+async function crearEquipo(codigo, silencioso){
+  const ref = doc(db,'gynkanas',gynkanaId,'equipos',codigo);
+  const existe = await getDoc(ref);
+  if(existe.exists()){ if(!silencioso) showToast('Ese código ya existe', 'err'); return; }
+  const secuencia = rotar(pruebas.map(p=>p.id), equipos.length);
+  await setDoc(ref, {
+    nombre: '', codigo, selfieUrl: null, miembros: [],
+    secuencia, completadas: {}, llegadaTs: null, revisadoPor: null,
+    createdAt: serverTimestamp()
+  });
+  if(!silencioso) showToast('Equipo creado: ' + codigo, 'ok');
+}
+window.borrarEquipo = async function(id){
+  if(!confirm(`¿Borrar el equipo ${id}? Esto no se puede deshacer.`)) return;
+  try{
+    await deleteDoc(doc(db,'gynkanas',gynkanaId,'equipos',id));
+    showToast('Equipo borrado', 'ok');
+  }catch(e){
+    console.error('[Organizador] Error borrando equipo', e);
+    showToast('No se pudo borrar', 'err');
+  }
+};
+function rotar(arr, i){
+  const n = arr.length;
+  if(!n) return arr;
+  const k = i % n;
+  return arr.slice(k).concat(arr.slice(0,k));
+}
+
+/* ══════════ AJUSTAR SITIOS ══════════ */
+let mapaAjuste = null;
+const marcadoresAjuste = []; // {pruebaId, sitioIndex, marker}
+function pintarAjuste(){
+  if(!pruebas.length) return;
+  if(!mapaAjuste){
+    mapaAjuste = L.map('mapa-ajuste').setView([36.5942,-6.2300], 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19
+    }).addTo(mapaAjuste);
+  }
+  marcadoresAjuste.forEach(m=> mapaAjuste.removeLayer(m.marker));
+  marcadoresAjuste.length = 0;
+
+  const listaEl = document.getElementById('ajuste-lista');
+  listaEl.innerHTML = '';
+  pruebas.forEach((p,i)=>{
+    (p.sitios||[]).forEach((s,si)=>{
+      const icon = L.divIcon({ className:'', iconSize:[30,30], iconAnchor:[15,15],
+        html:`<div class="pin-organizador">${i+1}</div>` });
+      const mk = L.marker([s.lat, s.lng], { icon, draggable:true, title:`${i+1}. ${p.titulo} — ${s.n}` }).addTo(mapaAjuste);
+      marcadoresAjuste.push({ pruebaId:p.id, sitioIndex:si, marker:mk });
+    });
+    const div = document.createElement('div');
+    div.className = 'ajuste-item';
+    div.innerHTML = `<div class="ajuste-item-titulo">${i+1}. ${p.titulo}</div>` +
+      (p.sitios||[]).map(s=>`<div class="ajuste-item-sitio">${s.n} · <span class="mono">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</span></div>`).join('');
+    listaEl.appendChild(div);
+  });
+}
+window.guardarAjuste = async function(){
+  const btn = document.getElementById('btn-guardar-ajuste');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try{
+    for(const p of pruebas){
+      const sitios = (p.sitios||[]).map((s,si)=>{
+        const m = marcadoresAjuste.find(x=>x.pruebaId===p.id && x.sitioIndex===si);
+        if(!m) return s;
+        const ll = m.marker.getLatLng();
+        return { n: s.n, lat: +ll.lat.toFixed(6), lng: +ll.lng.toFixed(6) };
+      });
+      await updateDoc(doc(db,'gynkanas',gynkanaId,'pruebas',p.id), { sitios });
+    }
+    await cargarPruebas();
+    showToast('Coordenadas guardadas', 'ok');
+  }catch(e){
+    console.error('[Organizador] Error guardando coordenadas', e);
+    showToast('No se pudo guardar', 'err');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Guardar coordenadas';
+  }
+};
+
+/* ══════════ CONFIGURACIÓN / SIEMBRA ══════════ */
+window.sembrarGynkana = async function(){
+  const nombre = document.getElementById('nueva-gynkana-nombre').value.trim() || 'Gynkana RCP';
+  try{
+    const gRef = doc(collection(db,'gynkanas'));
+    await setDoc(gRef, { nombre, activa: true, inicioTs: null, finTs: null, createdAt: serverTimestamp() });
+    const batch = writeBatch(db);
+    PRUEBAS_SEED.forEach(p=>{
+      const pRef = doc(db,'gynkanas',gRef.id,'pruebas',p.id);
+      batch.set(pRef, { orden:p.orden, titulo:p.titulo, brief:p.brief, sitios:p.sitios });
+    });
+    await batch.commit();
+    showToast('Gynkana creada con las 7 pruebas', 'ok');
+    await arrancar();
+  }catch(e){
+    console.error('[Organizador] Error sembrando la gynkana', e);
+    showToast('No se pudo crear la gynkana', 'err');
+  }
+};
+window.guardarNombreGynkana = async function(){
+  try{
+    await updateDoc(doc(db,'gynkanas',gynkanaId), { nombre: document.getElementById('config-nombre').value.trim() });
+    showToast('Nombre actualizado', 'ok');
+  }catch(e){ showToast('No se pudo guardar', 'err'); }
+};
+window.desactivarGynkana = async function(){
+  if(!confirm('Los equipos ya no podrán entrar con sus códigos hasta que actives otra gynkana. ¿Seguro?')) return;
+  try{
+    await updateDoc(doc(db,'gynkanas',gynkanaId), { activa:false, finTs: serverTimestamp() });
+    showToast('Evento desactivado', 'ok');
+    await arrancar();
+  }catch(e){ showToast('No se pudo desactivar', 'err'); }
+};
+
+arrancar();
+</script>
+</body>
+</html>

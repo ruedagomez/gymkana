@@ -574,19 +574,27 @@ window.confirmarLlegada = async function(){
 };
 
 /* ══════════ EQUIPOS / CÓDIGOS ══════════ */
-window.editandoNombreDe = null; // equipoId cuyo campo de nombre tiene el foco ahora mismo
+window.editandoFilaDe = null; // equipoId cuya fila (código o nombre) tiene el foco ahora mismo
 function pintarCodigos(){
-  if(window.editandoNombreDe) return; // no pisar lo que se está escribiendo con un repintado en vivo
+  if(window.editandoFilaDe) return; // no pisar lo que se está escribiendo con un repintado en vivo
   document.getElementById('tbl-equipos').innerHTML = equipos.map(e=>{
     const nombre = e.nombre || '';
     return `<tr>
-      <td class="mono">${e.id}</td>
+      <td>
+        <input class="tbl-nombre-input mono" type="text"
+          value="${escaparAtributo(e.id)}"
+          data-equipo-id="${e.id}"
+          onfocus="window.editandoFilaDe='${e.id}'"
+          onblur="window.editandoFilaDe=null; renombrarCodigoEquipo(this)"
+          onkeydown="if(event.key==='Enter') this.blur()">
+        <span class="tbl-guardado" id="guardado-codigo-${e.id}">Guardado</span>
+      </td>
       <td>
         <input class="tbl-nombre-input ${nombre?'':'sin-nombre'}" type="text"
           value="${escaparAtributo(nombre)}" placeholder="Sin registrar todavía"
           data-equipo-id="${e.id}"
-          onfocus="window.editandoNombreDe='${e.id}'"
-          onblur="window.editandoNombreDe=null; guardarNombreEquipo(this)"
+          onfocus="window.editandoFilaDe='${e.id}'"
+          onblur="window.editandoFilaDe=null; guardarNombreEquipo(this)"
           onkeydown="if(event.key==='Enter') this.blur()">
         <span class="tbl-guardado" id="guardado-${e.id}">Guardado</span>
       </td>
@@ -615,6 +623,66 @@ window.guardarNombreEquipo = async function(input){
   }catch(e){
     console.error('[Organizador] Error guardando el nombre', e);
     showToast('No se pudo guardar el nombre', 'err');
+  }
+};
+window.renombrarCodigoEquipo = async function(input){
+  const idAntiguo = input.dataset.equipoId;
+  const idNuevo = normalizarCodigo(input.value);
+
+  if(!idNuevo){
+    input.value = idAntiguo; // no se permite un código vacío
+    return;
+  }
+  if(idNuevo === idAntiguo) return; // sin cambios
+
+  if(equipos.some(e=>e.id===idNuevo)){
+    showToast('Ese código ya lo tiene otro equipo', 'err');
+    input.value = idAntiguo;
+    return;
+  }
+
+  input.disabled = true;
+  try{
+    const refAntigua = doc(db,'gynkanas',gynkanaId,'equipos',idAntiguo);
+    const snap = await getDoc(refAntigua);
+    if(!snap.exists()){
+      showToast('Este equipo ya no existe — puede que otra persona lo haya borrado', 'err');
+      pintarCodigos();
+      return;
+    }
+    const data = snap.data();
+    const refNueva = doc(db,'gynkanas',gynkanaId,'equipos',idNuevo);
+    const yaExiste = await getDoc(refNueva);
+    if(yaExiste.exists()){
+      showToast('Ese código ya lo tiene otro equipo', 'err');
+      input.value = idAntiguo;
+      return;
+    }
+
+    if((data.miembros||[]).length > 0){
+      const seguir = confirm(
+        `Este equipo ya se ha unido con el código "${idAntiguo}" desde al menos un móvil.\n\n` +
+        `Si cambias el código a "${idNuevo}", ese móvil dejará de reconocer su sesión y ` +
+        `tendrá que volver a introducir el código nuevo para seguir.\n\n¿Cambiar de todos modos?`
+      );
+      if(!seguir){ input.value = idAntiguo; return; }
+    }
+
+    // Firestore no permite renombrar el ID de un documento: se copia el
+    // contenido a un documento nuevo y se borra el antiguo. codigo se
+    // actualiza también para que quede coherente con el nuevo ID.
+    await setDoc(refNueva, { ...data, codigo: idNuevo });
+    await deleteDoc(refAntigua);
+
+    const marca = document.getElementById('guardado-codigo-'+idAntiguo);
+    if(marca){ marca.classList.add('show'); setTimeout(()=> marca.classList.remove('show'), 1600); }
+    showToast(`Código actualizado: ${idAntiguo} → ${idNuevo}`, 'ok');
+  }catch(e){
+    console.error('[Organizador] Error renombrando el código', e);
+    showToast('No se pudo cambiar el código', 'err');
+    input.value = idAntiguo;
+  }finally{
+    input.disabled = false;
   }
 };
 window.copiarTexto = function(t){

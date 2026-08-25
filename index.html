@@ -179,8 +179,19 @@ input{font-family:inherit;touch-action:manipulation;}
 }
 .hoja.on{transform:translateY(0);}
 .asa{width:40px;height:5px;border-radius:3px;background:var(--bdr);margin:8px auto 16px;}
+.hoja-valor{display:inline-flex;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--r);margin-bottom:6px;}
 .hoja h2{font-family:'Bebas Neue',sans-serif;font-size:25px;line-height:1.05;color:var(--txt);margin-bottom:10px;}
-.hoja .brief{font-size:15px;color:var(--txt);line-height:1.5;margin-bottom:18px;}
+.hoja .brief{font-size:15px;color:var(--txt);line-height:1.5;margin-bottom:12px;}
+.hoja-pasos{list-style:none;counter-reset:paso;margin-bottom:14px;}
+.hoja-pasos li{counter-increment:paso;display:flex;gap:10px;font-size:14.5px;color:var(--txt);line-height:1.4;padding:6px 0;border-bottom:1px solid var(--bdr);}
+.hoja-pasos li:last-child{border-bottom:none;}
+.hoja-pasos li::before{
+  content:counter(paso);flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+  background:var(--bg);border:1.5px solid var(--bdr);color:var(--mid);
+  display:grid;place-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;margin-top:1px;
+}
+.hoja-entrega{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em;color:var(--mid);background:var(--bg);border-radius:4px;padding:8px 12px;margin-bottom:16px;}
+.hoja-entrega b{color:var(--txt);}
 .opts{border-top:1px solid var(--bdr);margin-bottom:18px;}
 .opt{display:flex;align-items:center;gap:11px;width:100%;min-height:var(--tap);padding:12px 2px;border-bottom:1px solid var(--bdr);text-align:left;font-size:14.5px;}
 .opt.sel{font-weight:700;}
@@ -297,7 +308,7 @@ input{font-family:inherit;touch-action:manipulation;}
         <div class="retrato-mini" id="header-foto"></div>
         <div class="header-eq-info">
           <div class="header-eq-nombre" id="header-nombre">—</div>
-          <div class="header-eq-marcador"><b id="contador">0</b>/7 sellos</div>
+          <div class="header-eq-marcador"><b id="contador">0</b>/<span id="contador-total">—</span> sellos</div>
         </div>
         <button class="btn-ranking" id="btn-ver-ranking" type="button"><span>🏆</span>Ranking</button>
       </div>
@@ -322,8 +333,11 @@ input{font-family:inherit;touch-action:manipulation;}
 <div class="velo" id="velo"></div>
 <section class="hoja" id="hoja" role="dialog" aria-modal="true" aria-labelledby="hojaTitulo">
   <div class="asa"></div>
+  <div class="hoja-valor" id="hojaValor"></div>
   <h2 id="hojaTitulo"></h2>
   <p class="brief" id="hojaBrief"></p>
+  <ol class="hoja-pasos" id="hojaPasos"></ol>
+  <p class="hoja-entrega" id="hojaEntrega"></p>
   <div class="opts" id="hojaOpts"></div>
   <button class="cta" id="btnSellar"></button>
   <p class="nota" id="hojaNota"></p>
@@ -699,10 +713,14 @@ function pintarLista(){
   });
   const total = Object.keys(completadas).length;
   document.getElementById('contador').textContent = total;
+  document.getElementById('contador-total').textContent = pruebas.length;
   document.getElementById('meta').classList.toggle('on', total === pruebas.length && pruebas.length>0);
 }
 function etiquetaSitios(m){
   return (m.sitios||[]).length === 1 ? m.sitios[0].n : `${(m.sitios||[]).length} sitios a elegir`;
+}
+function escaparTexto(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 /* ---------- Hoja inferior ---------- */
@@ -714,7 +732,15 @@ function abrir(id){
   elegido = hecho ? Math.max(0, (m.sitios||[]).findIndex(s=>s.n===hecho.sitio)) : 0;
 
   document.getElementById('hojaTitulo').textContent = m.titulo;
-  document.getElementById('hojaBrief').textContent = m.brief;
+  document.getElementById('hojaValor').textContent = m.valor || '';
+  document.getElementById('hojaValor').style.display = m.valor ? '' : 'none';
+  document.getElementById('hojaBrief').textContent = m.objetivo || m.brief || '';
+  const pasosEl = document.getElementById('hojaPasos');
+  pasosEl.innerHTML = (m.pasos||[]).map(p=>`<li>${escaparTexto(p)}</li>`).join('');
+  pasosEl.style.display = (m.pasos && m.pasos.length) ? '' : 'none';
+  const entregaEl = document.getElementById('hojaEntrega');
+  entregaEl.innerHTML = m.entrega ? `<b>Entrega</b> · ${escaparTexto(m.entrega)}` : '';
+  entregaEl.style.display = m.entrega ? '' : 'none';
   pintarOpciones(m, !!hecho);
 
   const btn = document.getElementById('btnSellar');
@@ -816,7 +842,7 @@ function suscribirRanking(){
   }, err=> console.error('[Gynkana] Error escuchando el ranking', err));
 }
 function pintarRanking(equipos){
-  const totalPruebas = pruebas.length || 7;
+  const totalPruebas = pruebas.length || equipos.reduce((max,e)=>Math.max(max,Object.keys(e.completadas||{}).length),0) || '?';
   const llegados = equipos.filter(e=>e.llegadaTs).sort((a,b)=> tsNum(a.llegadaTs) - tsNum(b.llegadaTs));
   const enRuta = equipos.filter(e=>!e.llegadaTs).sort((a,b)=>{
     const ca = Object.keys(a.completadas||{}).length, cb = Object.keys(b.completadas||{}).length;

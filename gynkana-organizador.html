@@ -275,12 +275,12 @@ input,select,textarea{font-family:inherit;outline:none;}
 
     <div class="card" style="margin-bottom:20px;" id="config-sin-gynkana">
       <div class="card-title">Crear la gynkana</div>
-      <p class="form-hint" style="margin-bottom:14px;">No hay ninguna gynkana activa todavía. Esto siembra el documento del evento y las siete pruebas del brief (Palmera, Socio, Grada, Alcalde, Balón, Patrocinador, Abastos). Es seguro pulsarlo una sola vez.</p>
+      <p class="form-hint" style="margin-bottom:14px;">No hay ninguna gynkana activa todavía. Esto siembra el documento del evento y las seis pruebas de la presentación final (Palmera, El Puerto Juega, Patrocinio, Abastos, Ayuntamiento, Nuestra Afición). Es seguro pulsarlo una sola vez.</p>
       <div class="form-group">
         <label class="form-label">Nombre del evento</label>
         <input type="text" class="form-control" id="nueva-gynkana-nombre" value="Gynkana RCP — Pretemporada 2026/27"/>
       </div>
-      <button class="btn btn-primary" id="btn-sembrar" onclick="sembrarGynkana()">Crear gynkana y sembrar las 7 pruebas</button>
+      <button class="btn btn-primary" id="btn-sembrar" onclick="sembrarGynkana()">Crear gynkana y sembrar las 6 pruebas</button>
     </div>
 
     <div class="card" id="config-con-gynkana" style="display:none;margin-bottom:20px;">
@@ -291,6 +291,18 @@ input,select,textarea{font-family:inherit;outline:none;}
       </div>
       <button class="btn btn-ghost" onclick="guardarNombreGynkana()">Guardar nombre</button>
       <button class="btn btn-danger" onclick="desactivarGynkana()" style="margin-left:8px;">Desactivar evento</button>
+    </div>
+
+    <div class="card" id="config-actualizar-pruebas" style="display:none;margin-bottom:20px;border-left:3px solid var(--r);">
+      <div class="card-title">Actualizar contenido de las pruebas</div>
+      <p class="form-hint" style="margin-bottom:14px;">
+        Pasa esta gynkana a las 6 pruebas de la presentación final (quita la de la
+        Grada de Animación) y actualiza título, valor, pasos y entrega de las
+        demás. <b>No toca las coordenadas que ya hayas ajustado</b> — en Balón
+        solo quita de la lista los sitios eliminados (Romerijo, Bar Beti, Bar
+        Chino), conservando la posición exacta de los que se quedan.
+      </p>
+      <button class="btn btn-primary" id="btn-actualizar-pruebas" onclick="actualizarPruebasV2()">Actualizar a las 6 pruebas — conservar coordenadas</button>
     </div>
 
     <div class="card">
@@ -374,43 +386,92 @@ const app = initializeApp({
 });
 const db = getFirestore(app);
 
-/* ══════════ LAS SIETE PRUEBAS (contenido definitivo del brief) ══════════
-   Coordenadas aproximadas — corregir desde "Ajustar sitios" antes del evento. */
+/* ══════════ LAS SEIS PRUEBAS (presentación final, sin la de la Grada) ══════════
+   Coordenadas aproximadas — corregir desde "Ajustar sitios" antes del evento.
+   Este array solo se usa al crear una gynkana DESDE CERO (sembrarGynkana).
+   Para actualizar el contenido de una gynkana que YA existe sin perder las
+   coordenadas ya ajustadas a mano, usa "Actualizar contenido de las pruebas"
+   en Configuración — esa función no toca `sitios` salvo para quitar de Balón
+   los tres sitios eliminados. */
 const PRUEBAS_SEED = [
-  { id:'palmera', orden:1, titulo:'Anuncio para La Palmera',
-    brief:'La Venta La Palmera quiere llenar el comedor. Inventaos un eslogan publicitario para el restaurante y grabad el anuncio allí mismo. Que dé hambre.',
+  { id:'palmera', orden:1, titulo:'Venta La Palmera', valor:'Humildad',
+    objetivo:'Conocer y agradecer a quien cuida del club.',
+    pasos:[
+      'Presentaos como jugadores del Racing.',
+      'Haced una foto con el dueño.',
+      'Grabad un eslogan vendiendo La Palmera.',
+      'Grabad su respuesta y vuestro agradecimiento.'
+    ],
+    entrega:'1 foto + 1 vídeo de máximo 30 segundos.',
     sitios:[{n:'Venta La Palmera', lat:36.5861, lng:-6.2214}] },
-  { id:'socio', orden:2, titulo:'Un socio, un carnet, un himno',
-    brief:'Buscad un socio del Racing por el centro. Que enseñe su carnet a cámara y cante con vosotros un trozo del himno. Sin socio no hay sello.',
-    sitios:[{n:'Centro del Puerto', lat:36.5943, lng:-6.2326}] },
-  { id:'grada', orden:3, titulo:'Cantar en la sede de la Grada',
-    brief:'Id a la sede de la Grada de Animación y cantad con ellos. Grabadlo. Cuantas más voces se oigan, mejor.',
-    sitios:[{n:'Sede Grada de Animación', lat:36.5889, lng:-6.2141}] },
-  { id:'alcalde', orden:4, titulo:'Saludo en el Ayuntamiento',
-    brief:'Pasad por el Ayuntamiento a saludar al alcalde. Foto del saludo. Si no está, vale con quien os reciba — pero decid quién es.',
-    sitios:[{n:'Ayuntamiento', lat:36.5936, lng:-6.2299}] },
-  { id:'balon', orden:5, titulo:'Ejercicio con balón',
-    brief:'Un ejercicio con balón en un sitio emblemático del Puerto. Elegid uno de los seis.',
+
+  { id:'balon', orden:2, titulo:'El Puerto Juega', valor:'Pasión',
+    objetivo:'Llevar el fútbol a un lugar emblemático.',
+    pasos:[
+      'Elegid uno de los sitios del mapa.',
+      'Invitad respetuosamente a un ciudadano.',
+      'Cread un ejercicio en el que intervengáis todos.',
+      'Explicad dónde estáis y por qué lo habéis elegido.'
+    ],
+    entrega:'1 vídeo de entre 30 y 45 segundos.',
     sitios:[
       {n:'Castillo de San Marcos', lat:36.5940, lng:-6.2334},
       {n:'Plaza de España', lat:36.5947, lng:-6.2313},
-      {n:'Plaza de Toros', lat:36.5985, lng:-6.2290},
-      {n:'Romerijo', lat:36.5955, lng:-6.2345},
-      {n:'Bar Beti', lat:36.5949, lng:-6.2318},
-      {n:'Bar Chino', lat:36.5938, lng:-6.2308}
+      {n:'Plaza de Toros', lat:36.5985, lng:-6.2290}
     ]},
-  { id:'patro', orden:6, titulo:'Foto con un patrocinador',
-    brief:'Foto del equipo en uno de nuestros patrocinadores. Que se lea bien el nombre del negocio.',
+
+  { id:'patro', orden:3, titulo:'Patrocinio', valor:'Gratitud',
+    objetivo:'Agradecer a una empresa que confía en el club.',
+    pasos:[
+      'Encontrad el patrocinador señalado.',
+      'Averiguad a qué se dedica.',
+      'Haced una fotografía relacionada con su actividad.',
+      'Dadle las gracias y grabad un mensaje conjunto.'
+    ],
+    entrega:'1 foto + 1 vídeo de máximo 20 segundos.',
     sitios:[
       {n:'Cohebu', lat:36.5928, lng:-6.2280},
       {n:'Inmobiliaria Guadalete', lat:36.5951, lng:-6.2301},
       {n:'Datono', lat:36.5960, lng:-6.2287},
       {n:'Bar Apolo', lat:36.5945, lng:-6.2338}
     ]},
-  { id:'abastos', orden:7, titulo:'Un turno en la Plaza de Abastos',
-    brief:'Id a la Plaza de Abastos y echad una mano vendiendo en un puesto de fruta, pescado o carne. Grabad el momento con el vendedor.',
-    sitios:[{n:'Plaza de Abastos', lat:36.5946, lng:-6.2318}] }
+
+  { id:'abastos', orden:4, titulo:'Mercado de Abastos', valor:'Valentía',
+    objetivo:'Conectar con la vida cotidiana de El Puerto.',
+    pasos:[
+      'Acudid a un puesto.',
+      'Poneos a disposición del vendedor.',
+      'Vended pescado, fruta o carne usando lenguaje futbolístico.',
+      'Participad todos sin entorpecer el trabajo.'
+    ],
+    entrega:'1 vídeo de máximo 45 segundos.',
+    sitios:[{n:'Plaza de Abastos', lat:36.5946, lng:-6.2318}] },
+
+  { id:'alcalde', orden:5, titulo:'Ayuntamiento', valor:'Responsabilidad',
+    objetivo:'Explicar cómo queremos representar a El Puerto.',
+    pasos:[
+      'Acudid juntos al Ayuntamiento.',
+      'Haced una fotografía de todo el grupo en el balcón.',
+      'Preparad un mensaje dirigido a la ciudad.',
+      'Decid qué puede esperar El Puerto de este equipo.'
+    ],
+    entrega:'1 foto + 1 vídeo de máximo 20 segundos.',
+    sitios:[{n:'Ayuntamiento', lat:36.5936, lng:-6.2299}] },
+
+  { id:'socio', orden:6, titulo:'Nuestra Afición', valor:'Fe y Pasión',
+    objetivo:'Escuchar a quienes mantuvieron vivo el Racing.',
+    pasos:[
+      'Encontrad a un socio abonado del Racing.',
+      'Escuchad uno de sus recuerdos del club.',
+      'Preguntad qué esperan del equipo, además de ganar.',
+      'Grabad un cántico junto al socio.'
+    ],
+    entrega:'1 foto + 1 vídeo de máximo 45 segundos.',
+    sitios:[{n:'Centro del Puerto', lat:36.5943, lng:-6.2326}] }
 ];
+
+// Sitios que había antes en "Balón" y que se han quitado del juego.
+const SITIOS_BALON_ELIMINADOS = new Set(['Romerijo', 'Bar Beti', 'Bar Chino']);
 
 /* ══════════ ESTADO ══════════ */
 let gynkanaId = null;
@@ -464,6 +525,10 @@ async function arrancar(){
 
   await cargarPruebas();
   suscribirEquipos();
+  // Si esta gynkana tiene una prueba 'grada' o solo tiene el esquema
+  // antiguo (brief plano, sin objetivo/pasos), ofrece actualizarla.
+  const tieneEsquemaViejo = pruebas.some(p => p.id === 'grada' || (p.brief && !p.objetivo));
+  document.getElementById('config-actualizar-pruebas').style.display = tieneEsquemaViejo ? 'block' : 'none';
 }
 
 // Devuelve la MISMA gynkana activa que vería un equipo, incluso si por error
@@ -514,7 +579,7 @@ window.addEventListener('offline', ()=> marcarEstadoConexion(true));
 
 /* ══════════ RESUMEN ══════════ */
 function pintarResumen(){
-  const total = pruebas.length || 7;
+  const total = pruebas.length;
   document.getElementById('resumen-count').textContent = equipos.length + ' equipos';
   document.getElementById('kpi-equipos').textContent = equipos.length;
   document.getElementById('kpi-sellos').textContent = equipos.reduce((a,e)=>a+Object.keys(e.completadas||{}).length,0);
@@ -822,7 +887,7 @@ window.sembrarGynkana = async function(){
         `que ves aquí hasta que desactives la primera.\n\n` +
         `¿Desactivar "${existente.data.nombre || existente.id}" y crear la nueva?`
       );
-      if(!seguir){ btn.disabled = false; btn.textContent = 'Crear gynkana y sembrar las 7 pruebas'; return; }
+      if(!seguir){ btn.disabled = false; btn.textContent = 'Crear gynkana y sembrar las 6 pruebas'; return; }
       await updateDoc(doc(db,'gynkanas',existente.id), { activa:false, finTs: serverTimestamp() });
     }
     btn.textContent = 'Creando…';
@@ -831,16 +896,16 @@ window.sembrarGynkana = async function(){
     const batch = writeBatch(db);
     PRUEBAS_SEED.forEach(p=>{
       const pRef = doc(db,'gynkanas',gRef.id,'pruebas',p.id);
-      batch.set(pRef, { orden:p.orden, titulo:p.titulo, brief:p.brief, sitios:p.sitios });
+      batch.set(pRef, { orden:p.orden, titulo:p.titulo, valor:p.valor, objetivo:p.objetivo, pasos:p.pasos, entrega:p.entrega, sitios:p.sitios });
     });
     await batch.commit();
-    showToast('Gynkana creada con las 7 pruebas', 'ok');
+    showToast('Gynkana creada con las 6 pruebas', 'ok');
     await arrancar();
   }catch(e){
     console.error('[Organizador] Error sembrando la gynkana', e);
     showToast('No se pudo crear la gynkana', 'err');
   }finally{
-    btn.disabled = false; btn.textContent = 'Crear gynkana y sembrar las 7 pruebas';
+    btn.disabled = false; btn.textContent = 'Crear gynkana y sembrar las 6 pruebas';
   }
 };
 window.guardarNombreGynkana = async function(){
@@ -848,6 +913,61 @@ window.guardarNombreGynkana = async function(){
     await updateDoc(doc(db,'gynkanas',gynkanaId), { nombre: document.getElementById('config-nombre').value.trim() });
     showToast('Nombre actualizado', 'ok');
   }catch(e){ showToast('No se pudo guardar', 'err'); }
+};
+window.actualizarPruebasV2 = async function(){
+  if(!gynkanaId){ showToast('No hay gynkana activa', 'err'); return; }
+  const idsNuevos = new Set(PRUEBAS_SEED.map(p=>p.id));
+  const aBorrar = pruebas.filter(p => !idsNuevos.has(p.id)).map(p=>p.id); // p.ej. 'grada'
+  if(!confirm(
+    `Esto va a:\n\n` +
+    `• Quitar del juego: ${aBorrar.length ? aBorrar.join(', ') : '(nada que quitar)'}\n` +
+    `• Actualizar título, valor, pasos y entrega de las 6 pruebas que quedan\n` +
+    `• En Balón, quitar de la lista Romerijo, Bar Beti y Bar Chino\n` +
+    `• NO tocar ninguna coordenada ya ajustada de los sitios que se quedan\n\n` +
+    `¿Continuar?`
+  )) return;
+
+  const btn = document.getElementById('btn-actualizar-pruebas');
+  btn.disabled = true; btn.textContent = 'Actualizando…';
+  try{
+    // 1. Fuera las pruebas que ya no existen en el juego nuevo (p.ej. 'grada').
+    for(const id of aBorrar){
+      await deleteDoc(doc(db,'gynkanas',gynkanaId,'pruebas',id));
+    }
+
+    // 2. Leer los sitios ACTUALES de Balón (con tus coordenadas ya ajustadas)
+    //    y quitar solo los tres eliminados, sin tocar el resto.
+    const balonRef = doc(db,'gynkanas',gynkanaId,'pruebas','balon');
+    const balonSnap = await getDoc(balonRef);
+    const seedBalon = PRUEBAS_SEED.find(p=>p.id==='balon');
+    let sitiosBalon = seedBalon.sitios; // si 'balon' no existía todavía, usa los del seed
+    if(balonSnap.exists()){
+      const actuales = balonSnap.data().sitios || [];
+      const filtrados = actuales.filter(s => !SITIOS_BALON_ELIMINADOS.has(s.n));
+      if(filtrados.length) sitiosBalon = filtrados;
+    }
+
+    // 3. Actualizar (o crear si faltaba) las 6 pruebas. merge:true para no
+    //    tocar `sitios` salvo en 'balon', que es el único campo con cambios
+    //    de contenido (no solo de texto) en esta actualización.
+    const batch = writeBatch(db);
+    PRUEBAS_SEED.forEach(p=>{
+      const pRef = doc(db,'gynkanas',gynkanaId,'pruebas',p.id);
+      const campos = { orden:p.orden, titulo:p.titulo, valor:p.valor, objetivo:p.objetivo, pasos:p.pasos, entrega:p.entrega };
+      if(p.id === 'balon') campos.sitios = sitiosBalon;
+      batch.set(pRef, campos, { merge:true });
+    });
+    await batch.commit();
+
+    await cargarPruebas();
+    document.getElementById('config-actualizar-pruebas').style.display = 'none';
+    showToast('Pruebas actualizadas — coordenadas conservadas', 'ok');
+  }catch(e){
+    console.error('[Organizador] Error actualizando las pruebas', e);
+    showToast('No se pudo actualizar — revisa la consola', 'err');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Actualizar a las 6 pruebas — conservar coordenadas';
+  }
 };
 window.desactivarGynkana = async function(){
   if(!confirm('Los equipos ya no podrán entrar con sus códigos hasta que actives otra gynkana. ¿Seguro?')) return;
